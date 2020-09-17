@@ -1,0 +1,221 @@
+ Export data into Excel and PDF
+
+Spring Boot Excel File:
+ Apache POI is open source API that is used to convert our data into Excel Format.
+ This is integrated with Spring f/w.
+
+*) pom.xml:-
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi</artifactId>
+			<version>3.14</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>3.14</version>
+		</dependency>
+
+*) We need to write one class that extends one abstract class AbstractXlsxView(AC).
+*) We should get data from Database using SL and DAL when enduser clicks on
+   HyperLink (EXPORT EXCEL) using one controller method.
+
+*) This time method return type should be not a HTML file name, it is a class. So, use
+   ModelAndView. It contains Model(List<T>) and View(Our ExcelView Class object)
+
+*) Every Excel File is called as Book| workbook. Its file extension is .xlsx
+*) Workbook contains Sheets, identified using sheet name.
+*) Every Sheet contains Rows. Row number starts from zero.
+*) Every row contains Cells. Cell Number Starts from zero.
+
+*) Basic code points:
+#1. Write one public class that extends AbstractXlsxView.
+#2. override method buildExcelDocument(..)
+#3. Workbook object is  created by Spring f/w itself. So, you create Sheet,row and cells
+#5. Set Cell data
+#6. We can even modify filename also.
+
+#7. Add a method in Controller that will create ModelAndView object.
+    Add Our ExcelClass object to ModelAndView. So, that output will be Excel File.
+
+
+--Example code--
+package in.nareshit.raghu.view;
+
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.springframework.web.servlet.view.document.AbstractXlsxView;
+
+public class UomExcelView extends AbstractXlsxView {
+
+	@Override
+	protected void buildExcelDocument(
+			Map<String, Object> model, 
+			Workbook workbook, 
+			HttpServletRequest request,
+			HttpServletResponse response)
+					throws Exception 
+	{
+		
+		response.addHeader("Content-Disposition", "attachment;filename=uoms.xlsx");
+		
+		//create one sheet
+		Sheet sheet = workbook.createSheet("DUMMY");
+		
+		//create one row
+		Row row = sheet.createRow(0);
+		
+		//create one cell
+		Cell cell = row.createCell(0);
+		
+		//set data to this cell
+		cell.setCellValue("HELLO DATA");
+	}
+
+	
+}
+
+*) UomController:
+	@GetMapping("/excel")
+	public ModelAndView showExcel() {
+		ModelAndView m = new ModelAndView();
+		m.setView(new UomExcelView());
+		return m;
+	}
+*) Goto browser and Enter URL like:
+   http://localhost:8080/uom/excel
+
+===================Excel Example for Uom================
+Step#1 Write one Excel View class
+
+package in.nareshit.raghu.controller;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.ModelAndView;
+
+import in.nareshit.raghu.model.Uom;
+import in.nareshit.raghu.service.IUomService;
+import in.nareshit.raghu.view.UomExcelView;
+
+@Controller
+@RequestMapping("/uom")
+public class UomController {
+	@Autowired
+	private IUomService service;
+
+	//1. show Register Page
+	@GetMapping("/register")
+	public String showReg(Model model) {
+		//Form backing Object
+		model.addAttribute("uom", new Uom());
+		return "UomRegister";
+	}
+	
+	//2. on click save
+	@PostMapping("/save")
+	public String saveUom(
+			@ModelAttribute Uom uom,  //Read form data as object 
+			Model model) //send data to UI
+	{
+		//calling service
+		Integer id = service.saveUom(uom); 
+		String message = " Uom saved with id:"+id;
+		//sending data to UI
+		model.addAttribute("message", message);
+		
+		//Form backing Object
+		model.addAttribute("uom", new Uom());
+		return "UomRegister";
+	}
+	
+	//3. show data 
+	@GetMapping("/all")
+	public String getAllUoms(Model model) {
+		List<Uom> list =  service.getAllUoms();
+		model.addAttribute("list", list);
+		return "UomData";
+	}
+	
+	//4. delete one uom
+	@GetMapping("/delete")
+	public String deleteUom(
+			@RequestParam Integer id, 
+			Model model)
+	{
+		service.deleteUom(id);
+		model.addAttribute("message", "Uom '"+id+"' deleted");
+		model.addAttribute("list", service.getAllUoms());
+		return "UomData";
+	}
+	//5. show uom edit
+	@GetMapping("/edit")
+	public String showEdit(
+			@RequestParam Integer id,
+			Model model)
+	{
+		Uom uom = service.getOneUom(id);
+		model.addAttribute("uom", uom);
+		return "UomEdit";
+	}
+	
+	//6. update uom
+	@PostMapping("/update")
+	public String updateUom(
+			@ModelAttribute Uom uom,
+			Model model ) 
+	{
+		service.updateUom(uom);
+		model.addAttribute("message", "Uom '"+uom.getId()+"' Updated");
+		model.addAttribute("list", service.getAllUoms());
+		return "UomData";
+	}
+	
+	@GetMapping("/excel")
+	public ModelAndView exportToExcel() {
+		ModelAndView m = new ModelAndView();
+		m.setView(new UomExcelView());
+		
+		//fetch data from DB
+		List<Uom> list= service.getAllUoms();
+		//send data to View class
+		m.addObject("list", list);
+		return m;
+	}
+	
+	
+}
+
+
+Step#2 Define a method in UomController
+
+	@GetMapping("/excel")
+	public ModelAndView exportToExcel() {
+		ModelAndView m = new ModelAndView();
+		m.setView(new UomExcelView());
+		
+		//fetch data from DB
+		List<Uom> list= service.getAllUoms();
+		//send data to View class
+		m.addObject("list", list);
+		return m;
+	}
+
+Step#3 Create one HyperLink at UomData.html page
+<a th:href="@{/uom/excel}" class="btn btn-warning">EXCEL EXPORT</a>
